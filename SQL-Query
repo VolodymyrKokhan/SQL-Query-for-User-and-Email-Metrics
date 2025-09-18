@@ -1,0 +1,250 @@
+WITH account_information AS ( -- рахуємо кількість аккаунтів з групуванням за date, country, send_interval, is_verified, is_unsubscribed
+  SELECT
+  ss.date AS raw_date,
+  sp.country,
+  ac.send_interval,
+  ac.is_verified,
+  ac.is_unsubscribed,
+  COUNT (DISTINCT ac.id) AS account_cnt,
+  0 AS sent_msg, -- для корректного UNION і подальшого сумування
+  0 AS open_msg, -- для корректного UNION і подальшого сумування
+  0 AS visit_msg -- для корректного UNION і подальшого сумування
+  FROM `DA.account` ac
+  JOIN `DA.account_session` acs -- INNER JOIN адже нам не потрібні аккаунти без сесій, і відповідно без дат та країн, і навпаки, не потрібні країни без аккаунтів
+  ON ac.id = acs.account_id
+  JOIN `DA.session`ss -- приєднуємо для визначення дати
+  ON acs.ga_session_id = ss.ga_session_id
+  JOIN `DA.session_params` sp -- приєднуємо для визначення країни 
+  ON ss.ga_session_id = sp.ga_session_id
+  GROUP BY
+  raw_date,
+  sp.country,
+  ac.send_interval,
+  ac.is_verified,
+  ac.is_unsubscribed
+),
+
+
+email_sent_info AS ( -- окремий СТE кожного виду email, для врахування окремої дати для кожної події по email
+  SELECT
+  DATE_ADD(ss.date, INTERVAL es.sent_date DAY) AS raw_date, -- визначаємо дату email за допомогою DATE_ADD
+  sp.country,
+  ac.send_interval, -- обов'язково підтягуємо з таблиці account для корректного UNION та подальшого групування за цьома стовпчиками
+  ac.is_verified,
+  ac.is_unsubscribed,
+  0 AS account_cnt,
+  COUNT(DISTINCT es.id_message) AS sent_msg,
+  0 AS open_msg, -- для корректного UNION і подальшого сумування
+  0 AS visit_msg -- для корректного UNION і подальшого сумування
+  FROM `DA.email_sent` es
+  JOIN `DA.account_session` acs -- INNER JOIN адже нам не потрібні email без сесій, а відповідно без дат та країн, і навпаки
+  ON es.id_account = acs.account_id
+  JOIN `DA.session` ss -- приєднуємо 3 таблиці для визначення дати
+  ON ss.ga_session_id = acs.ga_session_id
+  JOIN `DA.session_params` sp -- приєднуємо для визначення країни 
+  ON ss.ga_session_id = sp.ga_session_id
+  JOIN `DA.account` ac 
+  ON es.id_account = ac.id
+  GROUP BY
+  raw_date,
+  sp.country,
+  ac.send_interval,
+  ac.is_verified,
+  ac.is_unsubscribed
+),
+
+
+email_open_info AS ( -- окремий СТE кожного виду email, для врахування окремої дати для кожної події по email
+  SELECT
+  DATE_ADD(ss.date, INTERVAL eo.open_date DAY) AS raw_date, -- визначаємо дату email за допомогою DATE_ADD
+  sp.country,
+  ac.send_interval, -- обов'язково підтягуємо з таблиці account для корректного UNION та подальшого групування за цьома стовпчиками
+  ac.is_verified,
+  ac.is_unsubscribed,
+  0 AS account_cnt, -- для корректного UNION і подальшого сумування
+  0 AS sent_msg, -- для корректного UNION і подальшого сумування
+  COUNT(DISTINCT eo.id_message) AS open_msg,
+  0 AS visit_msg -- для корректного UNION і подальшого сумування
+  FROM `DA.email_open`eo
+  JOIN `DA.account_session` acs -- INNER JOIN адже нам не потрібні email без сесій, а відповідно без дат та країн, і навпаки
+  ON eo.id_account = acs.account_id
+  JOIN `DA.session` ss -- приєднуємо 3 таблиці для визначення дати
+  ON ss.ga_session_id = acs.ga_session_id
+  JOIN `DA.session_params` sp -- приєднуємо для визначення країни
+  ON ss.ga_session_id = sp.ga_session_id
+  JOIN `DA.account` ac 
+  ON eo.id_account = ac.id
+  GROUP BY
+  raw_date,
+  sp.country,
+  ac.send_interval,
+  ac.is_verified,
+  ac.is_unsubscribed
+),
+
+
+email_visit_info AS ( -- окремий СТE кожного виду email, для врахування окремої дати для кожної події по email
+  SELECT
+  DATE_ADD(ss.date, INTERVAL ev.visit_date DAY) AS raw_date, -- визначаємо дату email за допомогою DATE_ADD
+  sp.country,
+  ac.send_interval, -- обов'язково підтягуємо з таблиці account для корректного UNION та подальшого групування за цьома стовпчиками
+  ac.is_verified,
+  ac.is_unsubscribed,
+  0 AS account_cnt, -- для корректного UNION і подальшого сумування
+  0 AS sent_msg, -- для корректного UNION і подальшого сумування
+  0 AS open_msg,  -- для корректного UNION і подальшого сумування
+  COUNT(DISTINCT ev.id_message) AS visit_msg -- для корректного UNION і подальшого сумування
+  FROM `DA.email_visit` ev
+  JOIN `DA.account_session` acs -- INNER JOIN адже нам не потрібні email без сесій, а відповідно без дат та країн, і навпаки
+  ON ev.id_account = acs.account_id
+  JOIN `DA.session` ss -- приєднуємо 3 таблиці для визначення дати
+  ON ss.ga_session_id = acs.ga_session_id
+  JOIN `DA.session_params` sp -- приєднуємо для визначення країни
+  ON ss.ga_session_id = sp.ga_session_id
+  JOIN `DA.account` ac 
+  ON ev.id_account = ac.id
+  GROUP BY
+  raw_date,
+  sp.country,
+  ac.send_interval,
+  ac.is_verified,
+  ac.is_unsubscribed
+),
+
+
+union_info_acc_email AS( -- об'єднуємо всі 4 таблиці в одну
+  SELECT
+  raw_date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg
+  FROM account_information
+
+
+  UNION ALL
+
+
+  SELECT
+  raw_date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg
+  FROM email_sent_info
+ 
+  UNION ALL
+
+
+  SELECT
+  raw_date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg
+  FROM email_open_info
+
+
+  UNION ALL
+
+
+  SELECT
+  raw_date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg
+  FROM email_visit_info
+),
+
+
+sum_unin_info AS ( -- cумуємо рядки в об'єднаних таблицяx та групуємо за date, country, send_interval, is_verified, is_unsubscribed для об'єднання рядків
+  SELECT
+  raw_date AS date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  SUM(account_cnt) AS account_cnt,
+  SUM(sent_msg) AS sent_msg,
+  SUM(open_msg) AS open_msg,
+  SUM(visit_msg) AS visit_msg
+  FROM union_info_acc_email
+  GROUP BY
+  date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed
+),
+
+
+total_info AS ( -- робимо підрахунки total за допомогою віконних функцій
+  SELECT  
+  date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg,
+  SUM (account_cnt) OVER (PARTITION BY country) AS total_country_account_cnt,
+  SUM (sent_msg) OVER(PARTITION BY country) AS total_country_sent_cnt,
+  FROM sum_unin_info
+),
+
+
+rank_info AS ( -- робимо підрахунки rank за допомогою віконних функцій
+  SELECT  
+  date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg,
+  total_country_account_cnt,
+  total_country_sent_cnt,
+  DENSE_RANK () OVER(ORDER BY total_country_account_cnt DESC) AS rank_total_country_account_cnt,
+  DENSE_RANK () OVER(ORDER BY total_country_sent_cnt DESC) AS rank_total_country_sent_cnt
+  FROM total_info
+)
+
+
+SELECT 
+  date,
+  country,
+  send_interval,
+  is_verified,
+  is_unsubscribed,
+  account_cnt,
+  sent_msg,
+  open_msg,
+  visit_msg,
+  total_country_account_cnt,
+  total_country_sent_cnt,
+  rank_total_country_account_cnt,
+  rank_total_country_sent_cnt
+FROM rank_info
+WHERE rank_total_country_account_cnt <= 10 OR rank_total_country_sent_cnt <= 10 -- обмежуємо за ранком
+ORDER BY date,rank_total_country_account_cnt -- сортуємо для начоності (необов’язково)
