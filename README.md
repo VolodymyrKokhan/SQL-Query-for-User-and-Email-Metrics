@@ -1,7 +1,7 @@
 # **SQL Query for User and Email Metrics**
 Writing an SQL query to gather data that will help analyze the dynamics of account creation, user activity from emails (sends, opens, clicks), and evaluate behavior within categories such as sending intervals, account verification, and subscription status
 
-![Country and Email metrics](SQL-Query-for-User-and-Email-Metrics/Visualisation.PNG)
+![Country and Email metrics](Visualisation.PNG)
 
 
 
