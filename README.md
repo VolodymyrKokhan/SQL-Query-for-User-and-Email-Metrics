@@ -1,7 +1,11 @@
 # **SQL Query for User and Email Metrics**
 Writing an SQL query to gather data that will help analyze the dynamics of account creation, user activity from emails (sends, opens, clicks), and evaluate behavior within categories such as sending intervals, account verification, and subscription status
 
-Vizualisation at Looker Studio https://lookerstudio.google.com/u/0/reporting/0d4fc7a8-0754-438d-9f44-71f2ca7f7429/page/12TSF
+![Country and Email metrics](SQL-Query-for-User-and-Email-Metrics/Visualisation.PNG)
+
+
+
+Visualisation at Looker Studio https://lookerstudio.google.com/u/0/reporting/0d4fc7a8-0754-438d-9f44-71f2ca7f7429/page/12TSF
 
 The result of the query should contain a specific list of grouping fields—that is, categorical values (with which no calculations are performed). The main account metrics, as well as the main email metrics, should be calculated across the following dimensions:
 
